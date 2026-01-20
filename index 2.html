@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Générateur de Prompt IA — RMC (Rôle • Mission • Cible)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --mac-bg-top: #f5f7fb;
+      --mac-bg-bottom: #e2e6f3;
+      --mac-card: #fdfdfd;
+      --mac-border: rgba(148, 163, 184, 0.35);
+      --mac-border-subtle: rgba(148, 163, 184, 0.25);
+      --mac-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+      --mac-radius-lg: 22px;
+      --mac-radius-xl: 26px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+    }
+
+    .glass {
+      backdrop-filter: blur(18px) saturate(160%);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.70));
+      border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    .mac-card {
+      border-radius: var(--mac-radius-xl);
+      background: radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.98));
+      box-shadow: var(--mac-shadow);
+      border: 1px solid var(--mac-border);
+    }
+
+    .mac-subcard {
+      border-radius: 18px;
+      border: 1px solid var(--mac-border-subtle);
+      background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.96));
+    }
+
+    .shadow-soft { box-shadow: 0 14px 35px rgba(15, 23, 42, .18); }
+
+    .mono { font-variant-ligatures: none; font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .kbd {
+      border: 1px solid rgb(226 232 240);
+      background: linear-gradient(145deg, #f9fafb, #e5e7eb);
+      border-bottom-width: 2px;
+      padding: .1rem .45rem;
+      border-radius: .5rem;
+      font-size: .78rem;
+      box-shadow: 0 1px 0 rgba(148, 163, 184, 0.7);
+    }
+
+    .scrollbar::-webkit-scrollbar { width: 9px; height: 9px; }
+    .scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.7);
+      border-radius: 999px;
+      border: 2px solid rgba(241, 245, 249, 0.95);
+    }
+    .scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 999px; }
+
+    /* Mac window header (traffic lights) */
+    .mac-window-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .mac-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.07);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+    }
+    .mac-dot.red { background: #ff5f57; }
+    .mac-dot.amber { background: #febc2e; }
+    .mac-dot.green { background: #28c840; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[var(--mac-bg-top)] via-white to-[var(--mac-bg-bottom)] text-slate-900">
+  <header class="sticky top-0 z-40 border-b border-slate-200/70 glass">
+    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
+      <div class="flex items-center gap-3">
+        <div class="mac-window-bar mr-1">
+          <span class="mac-dot red"></span>
+          <span class="mac-dot amber"></span>
+          <span class="mac-dot green"></span>
+        </div>
+        <div class="h-9 px-3 rounded-2xl bg-slate-900 text-white flex items-center shadow-soft">
+          <span class="font-semibold tracking-tight">AI Prompt Studio</span>
+        </div>
+        <div class="hidden sm:block">
+          <h1 class="text-lg leading-tight font-semibold tracking-tight">Générateur de Prompt</h1>
+          <p class="text-xs text-slate-600">Compose des prompts clairs avec RMC (Rôle • Mission • Cible), impératifs & souhaits.</p>
+        </div>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button id="btnReset" class="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Réinitialiser</button>
+        <button id="btnCopy" class="px-3 py-2 text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-soft">Copier le prompt</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6">
+    <div class="grid lg:grid-cols-2 gap-5">
+      <!-- Builder -->
+      <section class="mac-card p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="font-semibold">Paramètres</h2>
+            <p class="text-sm text-slate-600">Remplis ce que tu sais. L’aperçu se met à jour en direct.</p>
+          </div>
+          <div class="text-xs text-slate-500">Astuce : <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> pour copier</div>
+        </div>
+
+        <div class="mt-4 grid sm:grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-sm font-medium">IA cible</span>
+            <select id="aiTarget" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="chat">ChatGPT / OpenAI</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="gemini">Gemini (Google)</option>
+              <option value="copilot">Copilot (Microsoft)</option>
+              <option value="perplexity">Perplexity</option>
+              <option value="midjourney">Midjourney (image)</option>
+              <option value="dalle">DALL·E (image)</option>
+              <option value="stable">Stable Diffusion (image)</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="text-sm font-medium">Type de contenu</span>
+            <select id="contentType" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="article">Article / blog</option>
+              <option value="email">Email</option>
+              <option value="post">Post réseaux sociaux</option>
+              <option value="seo">Brief SEO</option>
+              <option value="script">Script vidéo / podcast</option>
+              <option value="resume">Résumé / synthèse</option>
+              <option value="plan">Plan / structure</option>
+              <option value="code">Code / dev</option>
+              <option value="image">Prompt image</option>
+              <option value="custom">Autre (personnalisé)</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="text-sm font-medium">Langue de sortie</span>
+            <select id="outputLang" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="fr" selected>Français</option>
+              <option value="en">Anglais</option>
+              <option value="es">Espagnol</option>
+              <option value="de">Allemand</option>
+              <option value="it">Italien</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="text-sm font-medium">Ton</span>
+            <select id="tone" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="neutre" selected>Neutre / clair</option>
+              <option value="pro">Professionnel</option>
+              <option value="amical">Amical</option>
+              <option value="persuasif">Persuasif</option>
+              <option value="expert">Très expert</option>
+              <option value="pedagogique">Pédagogique</option>
+              <option value="creatif">Créatif</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="mt-3 grid gap-3">
+          <label class="block">
+            <span class="text-sm font-medium">Sujet / contexte (ce que l’IA doit savoir)</span>
+            <textarea id="context" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Ex : Je lance une formation sur la productivité pour freelances. Je veux une page de vente courte..."></textarea>
+          </label>
+
+          <div class="grid sm:grid-cols-3 gap-3">
+            <label class="block">
+              <span class="text-sm font-medium">Rôle (R)</span>
+              <textarea id="role" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Ex : Tu es un copywriter senior spécialisé en SaaS."></textarea>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">Mission (M)</span>
+              <textarea id="mission" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Ex : Rédige 3 variantes d’un email de relance avec CTA."></textarea>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">Cible (C)</span>
+              <textarea id="target" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Ex : Responsables RH de PME (20-200) en France."></textarea>
+            </label>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="mac-subcard p-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-semibold">Impératifs (obligatoire)</h3>
+                  <p class="text-xs text-slate-600">Ce qui doit absolument être respecté.</p>
+                </div>
+              </div>
+              <div class="mt-2 flex gap-2">
+                <input id="impInput" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Ex : Ne pas inventer de chiffres." />
+                <button id="impAdd" class="shrink-0 px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Ajouter</button>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2" id="impChips"></div>
+              <div class="mt-3">
+                <div class="text-xs font-medium text-slate-600">Suggestions rapides</div>
+                <div class="mt-2 flex flex-wrap gap-2" id="impQuick"></div>
+              </div>
+            </div>
+
+            <div class="mac-subcard p-3">
+              <div>
+                <h3 class="text-sm font-semibold">Souhaits (optionnel)</h3>
+                <p class="text-xs text-slate-600">Ce qui serait idéal, si possible.</p>
+              </div>
+              <div class="mt-2 flex gap-2">
+                <input id="wishInput" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Ex : Ajouter 2 analogies simples." />
+                <button id="wishAdd" class="shrink-0 px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Ajouter</button>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2" id="wishChips"></div>
+              <div class="mt-3">
+                <div class="text-xs font-medium text-slate-600">Suggestions rapides</div>
+                <div class="mt-2 flex flex-wrap gap-2" id="wishQuick"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="block">
+              <span class="text-sm font-medium">Format de sortie</span>
+              <select id="format" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="markdown" selected>Markdown</option>
+                <option value="liste">Liste à puces</option>
+                <option value="table">Tableau</option>
+                <option value="json">JSON</option>
+                <option value="etapes">Étapes numérotées</option>
+                <option value="custom">Personnalisé (champ ci-dessous)</option>
+              </select>
+            </label>
+
+            <label class="block">
+              <span class="text-sm font-medium">Longueur</span>
+              <select id="length" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="courte">Courte</option>
+                <option value="moyenne" selected>Moyenne</option>
+                <option value="longue">Longue</option>
+                <option value="treslongue">Très longue</option>
+              </select>
+            </label>
+
+            <label class="block sm:col-span-2" id="formatCustomWrap" style="display:none;">
+              <span class="text-sm font-medium">Format personnalisé</span>
+              <input id="formatCustom" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Ex : Commence par un TL;DR, puis une section 'Actions', puis des FAQ." />
+            </label>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 p-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold">Options</h3>
+                <p class="text-xs text-slate-600">Aide l’IA à mieux cadrer sa réponse.</p>
+              </div>
+            </div>
+
+            <div class="mt-2 grid sm:grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 text-sm">
+                <input id="optQuestions" type="checkbox" class="h-4 w-4" checked />
+                Poser des questions de clarification si nécessaire
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input id="optAssumptions" type="checkbox" class="h-4 w-4" checked />
+                Indiquer les hypothèses si info manquante
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input id="optSources" type="checkbox" class="h-4 w-4" />
+                Ajouter des sources (si applicable)
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input id="optChecklist" type="checkbox" class="h-4 w-4" />
+                Ajouter une checklist de vérification
+              </label>
+            </div>
+
+            <div class="mt-3">
+              <label class="block">
+                <span class="text-sm font-medium">Contraintes supplémentaires (optionnel)</span>
+                <textarea id="constraints" rows="2" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Ex : Inclure un exemple chiffré, éviter le jargon, respecter la RGPD..."></textarea>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnSave" class="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Enregistrer dans l’historique</button>
+            <button id="btnDownload" class="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Télécharger .txt</button>
+            <div class="ml-auto text-xs text-slate-600">Caractères : <span id="charCount" class="font-semibold">0</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Preview & History -->
+      <section class="mac-card p-4 flex flex-col min-h-[560px]">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="font-semibold">Aperçu du prompt</h2>
+            <p class="text-sm text-slate-600">Optimisé selon l’IA choisie. Tu peux copier et coller directement.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnWrap" class="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white hover:bg-slate-50" title="Basculer le retour à la ligne">Wrap</button>
+            <button id="btnToastTest" class="hidden">toast</button>
+          </div>
+        </div>
+
+        <div class="mt-3 flex-1 grid grid-rows-[1fr_auto] gap-3">
+          <div class="relative">
+            <textarea id="preview" class="mono scrollbar w-full h-full min-h-[280px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-5" spellcheck="false"></textarea>
+            <div class="pointer-events-none absolute inset-x-3 bottom-3 flex justify-end">
+              <div id="aiHint" class="pointer-events-auto text-[11px] text-slate-600 bg-white/80 border border-slate-200 rounded-full px-2 py-1">Conseil : ajoute des exemples concrets pour de meilleurs résultats</div>
+            </div>
+          </div>
+
+          <div class="mac-subcard p-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold">Historique (local)</h3>
+              <button id="btnClearHistory" class="text-sm px-2 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50">Effacer</button>
+            </div>
+            <div id="history" class="mt-2 max-h-40 overflow-auto scrollbar text-sm"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="mt-5 mac-card p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 class="font-semibold">Bibliothèque de modèles</h2>
+          <p class="text-sm text-slate-600">Charge un modèle pour démarrer rapidement (modifiable ensuite).</p>
+        </div>
+      </div>
+      <div id="templates" class="mt-3 grid md:grid-cols-3 gap-3"></div>
+    </section>
+
+    <footer class="mt-6 text-center text-xs text-slate-500">
+      <p>Astuce : un bon prompt = contexte + RMC + contraintes + format de sortie. Rien n’est envoyé : tout reste dans ton navigateur.</p>
+    </footer>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden">
+    <div class="rounded-2xl bg-slate-900 text-white px-4 py-2 text-sm shadow-soft">Copié dans le presse‑papier</div>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    const els = {
+      aiTarget: $('#aiTarget'),
+      contentType: $('#contentType'),
+      outputLang: $('#outputLang'),
+      tone: $('#tone'),
+      context: $('#context'),
+      role: $('#role'),
+      mission: $('#mission'),
+      target: $('#target'),
+      constraints: $('#constraints'),
+      format: $('#format'),
+      formatCustom: $('#formatCustom'),
+      formatCustomWrap: $('#formatCustomWrap'),
+      length: $('#length'),
+      optQuestions: $('#optQuestions'),
+      optAssumptions: $('#optAssumptions'),
+      optSources: $('#optSources'),
+      optChecklist: $('#optChecklist'),
+      preview: $('#preview'),
+      charCount: $('#charCount'),
+      aiHint: $('#aiHint'),
+
+      impInput: $('#impInput'),
+      impAdd: $('#impAdd'),
+      impChips: $('#impChips'),
+      impQuick: $('#impQuick'),
+
+      wishInput: $('#wishInput'),
+      wishAdd: $('#wishAdd'),
+      wishChips: $('#wishChips'),
+      wishQuick: $('#wishQuick'),
+
+      btnCopy: $('#btnCopy'),
+      btnReset: $('#btnReset'),
+      btnSave: $('#btnSave'),
+      btnDownload: $('#btnDownload'),
+      btnClearHistory: $('#btnClearHistory'),
+      btnWrap: $('#btnWrap'),
+
+      history: $('#history'),
+      templates: $('#templates'),
+      toast: $('#toast')
+    };
+
+    const state = {
+      imperatifs: [],
+      souhaits: [],
+      wrap: true,
+    };
+
+    const quickImperatifs = [
+      "Ne pas inventer (si tu ne sais pas, dis-le)",
+      "Respecter le contexte fourni", 
+      "Réponse structurée", 
+      "Éviter le jargon", 
+      "Donner des exemples concrets"
+    ];
+
+    const quickSouhaits = [
+      "Proposer 2 variantes", 
+      "Ajouter une checklist", 
+      "Inclure un TL;DR", 
+      "Donner des alternatives", 
+      "Ajouter une section FAQ"
+    ];
+
+    const templates = [
+      {
+        id: 'email_relance',
+        title: 'Email de relance (pro)',
+        desc: '3 variantes + objets + CTA',
+        apply: () => {
+          els.aiTarget.value = 'chat';
+          els.contentType.value = 'email';
+          els.tone.value = 'pro';
+          els.context.value = "Contexte : un prospect a demandé une démo il y a 7 jours, pas de réponse depuis.";
+          els.role.value = "Tu es un commercial B2B senior, orienté valeur et concision.";
+          els.mission.value = "Écrire 3 emails de relance courts avec 3 objets différents, et un CTA clair.";
+          els.target.value = "Décideurs (CEO/COO) de PME.";
+          state.imperatifs = ["Rester bref (≤ 120 mots)", "Un seul CTA", "Ton professionnel, pas insistant"]; 
+          state.souhaits = ["Ajouter une phrase de personnalisation", "Inclure une option 'pas le bon moment'"].slice();
+        }
+      },
+      {
+        id: 'article_seo',
+        title: 'Brief SEO (article)',
+        desc: 'Plan + intention + mots-clés',
+        apply: () => {
+          els.aiTarget.value = 'gemini';
+          els.contentType.value = 'seo';
+          els.tone.value = 'expert';
+          els.context.value = "Sujet : 'gestion du temps pour freelances'. Objectif : se positionner sur Google.";
+          els.role.value = "Tu es un consultant SEO senior.";
+          els.mission.value = "Créer un brief SEO complet pour un article : intention, angle, plan H1/H2/H3, FAQ, suggestions de mots-clés.";
+          els.target.value = "Freelances francophones.";
+          state.imperatifs = ["Structure Hn claire", "Inclure une FAQ", "Recommander des mots-clés (principaux + secondaires)"]; 
+          state.souhaits = ["Suggérer des internal links", "Proposer un meta title + meta description"].slice();
+        }
+      },
+      {
+        id: 'prompt_image',
+        title: 'Prompt image (style pub)',
+        desc: 'Sujet + style + caméra + lumière',
+        apply: () => {
+          els.aiTarget.value = 'midjourney';
+          els.contentType.value = 'image';
+          els.tone.value = 'creatif';
+          els.context.value = "Visuel publicitaire pour une boisson énergisante naturelle, ambiance premium.";
+          els.role.value = "";
+          els.mission.value = "Générer un prompt image détaillé (sujet, décor, style, lumière, composition, caméra) + 3 variantes.";
+          els.target.value = "Audience 18-35, sport & lifestyle.";
+          state.imperatifs = ["Rendu photoréaliste", "Éclairage studio avec rim light", "Couleurs premium (noir/or)"]; 
+          state.souhaits = ["Ajoute des paramètres MJ (aspect ratio, stylize)"].slice();
+        }
+      }
+    ];
+
+    function langLabel(code) {
+      return ({ fr: 'Français', en: 'English', es: 'Español', de: 'Deutsch', it: 'Italiano' }[code] || code);
+    }
+
+    function contentLabel(val) {
+      const map = {
+        article: 'Article / blog',
+        email: 'Email',
+        post: 'Post réseaux sociaux',
+        seo: 'Brief SEO',
+        script: 'Script vidéo / podcast',
+        resume: 'Résumé / synthèse',
+        plan: 'Plan / structure',
+        code: 'Code / dev',
+        image: 'Prompt image',
+        custom: 'Contenu personnalisé'
+      };
+      return map[val] || val;
+    }
+
+    function aiLabel(val) {
+      const map = {
+        chat: 'ChatGPT / OpenAI',
+        claude: 'Claude (Anthropic)',
+        gemini: 'Gemini (Google)',
+        copilot: 'Copilot (Microsoft)',
+        perplexity: 'Perplexity',
+        midjourney: 'Midjourney',
+        dalle: 'DALL·E',
+        stable: 'Stable Diffusion'
+      };
+      return map[val] || val;
+    }
+
+    function isImageAI(ai) {
+      return ['midjourney', 'dalle', 'stable'].includes(ai);
+    }
+
+    function normalizeList(list) {
+      return (list || []).map(s => (s || '').trim()).filter(Boolean);
+    }
+
+    function setHint(text) {
+      els.aiHint.textContent = text;
+    }
+
+    function renderChips(container, items, onRemove) {
+      container.innerHTML = '';
+      normalizeList(items).forEach((txt, idx) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs hover:bg-slate-50';
+        chip.title = 'Cliquer pour supprimer';
+        chip.innerHTML = `
+          <span class="text-slate-800">${escapeHtml(txt)}</span>
+          <span class="text-slate-400 group-hover:text-slate-700">✕</span>
+        `;
+        chip.addEventListener('click', () => onRemove(idx));
+        container.appendChild(chip);
+      });
+    }
+
+    function renderQuick(container, items, onAdd) {
+      container.innerHTML = '';
+      items.forEach((txt) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs hover:bg-white';
+        b.textContent = `+ ${txt}`;
+        b.addEventListener('click', () => onAdd(txt));
+        container.appendChild(b);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function currentFormatInstruction() {
+      const f = els.format.value;
+      if (f === 'custom') {
+        const custom = (els.formatCustom.value || '').trim();
+        return custom ? custom : 'Format personnalisé.';
+      }
+      const map = {
+        markdown: 'Répondre en Markdown, avec titres clairs.',
+        liste: 'Répondre sous forme de liste à puces.',
+        table: 'Répondre sous forme de tableau (quand pertinent).',
+        json: 'Répondre en JSON valide, avec des clés explicites.',
+        etapes: 'Répondre en étapes numérotées, actionnables.'
+      };
+      return map[f] || 'Format libre.';
+    }
+
+    function lengthInstruction() {
+      const l = els.length.value;
+      const map = {
+        courte: 'Longueur : courte (aller à l’essentiel).',
+        moyenne: 'Longueur : moyenne (équilibrée).',
+        longue: 'Longueur : longue (détaillée).',
+        treslongue: 'Longueur : très longue (très détaillée, exhaustive).'
+      };
+      return map[l] || '';
+    }
+
+    function buildPromptText() {
+      const ai = els.aiTarget.value;
+      const type = els.contentType.value;
+      const outLang = els.outputLang.value;
+      const tone = els.tone.value;
+
+      const context = (els.context.value || '').trim();
+      const role = (els.role.value || '').trim();
+      const mission = (els.mission.value || '').trim();
+      const target = (els.target.value || '').trim();
+      const constraints = (els.constraints.value || '').trim();
+      const imperatifs = normalizeList(state.imperatifs);
+      const souhaits = normalizeList(state.souhaits);
+
+      // If user asks for image prompt content type, it should use image-friendly format.
+      const wantsImage = type === 'image' || isImageAI(ai);
+
+      if (wantsImage) {
+        setHint('Conseil : précise sujet, style, lumière, caméra, composition, et ce qu’il faut éviter.');
+        const parts = [];
+        parts.push(`OBJECTIF : Générer un prompt image pour ${aiLabel(ai)}.`);
+        parts.push(`TYPE : ${contentLabel(type)}.`);
+        parts.push(`LANGUE : ${langLabel(outLang)}.`);
+        if (context) parts.push(`CONTEXTE : ${context}`);
+        if (mission) parts.push(`MISSION : ${mission}`);
+        if (target) parts.push(`CIBLE : ${target}`);
+        if (imperatifs.length) {
+          parts.push('IMPÉRATIFS (à intégrer dans le prompt image) :');
+          imperatifs.forEach((x) => parts.push(`- ${x}`));
+        }
+        if (souhaits.length) {
+          parts.push('SOUHAITS (si possible) :');
+          souhaits.forEach((x) => parts.push(`- ${x}`));
+        }
+        if (constraints) parts.push(`CONTRAINTES : ${constraints}`);
+        parts.push('SORTIE ATTENDUE :');
+        parts.push('- 1 prompt principal (une seule ligne si possible)');
+        parts.push('- 3 variantes');
+        if (ai === 'midjourney') {
+          parts.push('- Inclure des paramètres optionnels (ex: --ar, --stylize) si pertinent');
+        }
+        parts.push('- Ajouter une section "Negative prompt" (ce qu’il faut éviter), si utile');
+        return parts.join('\n');
+      }
+
+      // Text AIs
+      const isSearchAI = (ai === 'perplexity');
+      setHint(isSearchAI ? 'Conseil : formule une question précise + demande des sources.' : 'Conseil : ajoute des exemples concrets pour de meilleurs résultats.');
+
+      const blocks = [];
+      blocks.push(`# Prompt — ${aiLabel(ai)}\n`);
+
+      // "System-like" instruction for models that accept it
+      const meta = [];
+      if (role) meta.push(`RÔLE : ${role}`);
+      if (tone) {
+        const toneText = {
+          neutre: 'Ton : clair, direct, neutre.',
+          pro: 'Ton : professionnel, concis, orienté résultats.',
+          amical: 'Ton : amical, accessible.',
+          persuasif: 'Ton : persuasif, orienté bénéfices, sans manipulation.',
+          expert: 'Ton : très expert, précis, avec nuances.',
+          pedagogique: 'Ton : pédagogique, progressif, avec exemples.',
+          creatif: 'Ton : créatif, original, mais cohérent.'
+        }[tone] || `Ton : ${tone}.`;
+        meta.push(toneText);
+      }
+      meta.push(`Langue de sortie : ${langLabel(outLang)}.`);
+      meta.push(`Type de contenu : ${contentLabel(type)}.`);
+      meta.push(lengthInstruction());
+      meta.push(currentFormatInstruction());
+
+      blocks.push(`## Cadre\n${meta.filter(Boolean).map(x => `- ${x}`).join('\n')}`);
+
+      if (context) blocks.push(`\n## Contexte\n${context}`);
+
+      // RMC
+      const rmc = [];
+      if (role) rmc.push(`- **Rôle** : ${role}`);
+      if (mission) rmc.push(`- **Mission** : ${mission}`);
+      if (target) rmc.push(`- **Cible** : ${target}`);
+      if (rmc.length) blocks.push(`\n## RMC (Rôle • Mission • Cible)\n${rmc.join('\n')}`);
+
+      // Requirements
+      if (imperatifs.length) {
+        blocks.push(`\n## Impératifs (obligatoires)\n${imperatifs.map(x => `- ${x}`).join('\n')}`);
+      }
+      if (souhaits.length) {
+        blocks.push(`\n## Souhaits (optionnels)\n${souhaits.map(x => `- ${x}`).join('\n')}`);
+      }
+      if (constraints) blocks.push(`\n## Contraintes supplémentaires\n${constraints}`);
+
+      // Options
+      const options = [];
+      if (els.optAssumptions.checked) options.push('Si une information manque, liste tes **hypothèses** explicitement.');
+      if (els.optQuestions.checked) options.push('Si nécessaire, pose **jusqu’à 5 questions** de clarification avant de répondre.');
+      if (els.optSources.checked) options.push('Si tu avances des faits, ajoute des **sources** (liens) ou indique que c’est une estimation.');
+      if (els.optChecklist.checked) options.push('Termine par une **checklist** de vérification.');
+
+      if (options.length) blocks.push(`\n## Garde-fous\n${options.map(x => `- ${x}`).join('\n')}`);
+
+      // Perplexity: emphasize question + sources
+      if (isSearchAI) {
+        blocks.push(`\n## Instruction spécifique (Perplexity)\n- Réponds comme un moteur de recherche assisté : synthèse + liens + points clés.`);
+      }
+
+      blocks.push(`\n## Tâche\n${mission || `Produire ${contentLabel(type).toLowerCase()} selon le cadre ci-dessus.`}`);
+
+      return blocks.join('\n');
+    }
+
+    function updatePreview() {
+      // custom format visibility
+      if (els.format.value === 'custom') {
+        els.formatCustomWrap.style.display = '';
+      } else {
+        els.formatCustomWrap.style.display = 'none';
+      }
+
+      // if image AI is selected, switch contentType to image unless user chose something else intentionally
+      const ai = els.aiTarget.value;
+      if (isImageAI(ai) && els.contentType.value !== 'image') {
+        // soft nudge: do not force; but show hint by changing aiHint
+        setHint('IA image détectée : choisis "Prompt image" pour un format optimal.');
+      }
+
+      // update prompt
+      const prompt = buildPromptText();
+      els.preview.value = prompt;
+      els.charCount.textContent = String(prompt.length);
+
+      els.preview.style.whiteSpace = state.wrap ? 'pre-wrap' : 'pre';
+    }
+
+    function showToast(msg) {
+      const box = els.toast.querySelector('div');
+      box.textContent = msg;
+      els.toast.classList.remove('hidden');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => els.toast.classList.add('hidden'), 1300);
+    }
+
+    async function copyPrompt() {
+      const txt = els.preview.value;
+      try {
+        await navigator.clipboard.writeText(txt);
+        showToast('Copié dans le presse-papier');
+      } catch (e) {
+        // fallback
+        els.preview.focus();
+        els.preview.select();
+        document.execCommand('copy');
+        showToast('Copié (mode compatibilité)');
+      }
+    }
+
+    function downloadTxt(filename, content) {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // History
+    const HISTORY_KEY = 'promptgen_history_v1';
+
+    function loadHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        const items = raw ? JSON.parse(raw) : [];
+        return Array.isArray(items) ? items : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(items) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+    }
+
+    function getFormSnapshot() {
+      return {
+        ts: Date.now(),
+        title: `${contentLabel(els.contentType.value)} — ${aiLabel(els.aiTarget.value)}`,
+        data: {
+          aiTarget: els.aiTarget.value,
+          contentType: els.contentType.value,
+          outputLang: els.outputLang.value,
+          tone: els.tone.value,
+          context: els.context.value,
+          role: els.role.value,
+          mission: els.mission.value,
+          target: els.target.value,
+          constraints: els.constraints.value,
+          format: els.format.value,
+          formatCustom: els.formatCustom.value,
+          length: els.length.value,
+          optQuestions: els.optQuestions.checked,
+          optAssumptions: els.optAssumptions.checked,
+          optSources: els.optSources.checked,
+          optChecklist: els.optChecklist.checked,
+          imperatifs: normalizeList(state.imperatifs),
+          souhaits: normalizeList(state.souhaits)
+        },
+        prompt: els.preview.value
+      };
+    }
+
+    function applySnapshot(snapshot) {
+      const d = snapshot?.data;
+      if (!d) return;
+      els.aiTarget.value = d.aiTarget ?? 'chat';
+      els.contentType.value = d.contentType ?? 'article';
+      els.outputLang.value = d.outputLang ?? 'fr';
+      els.tone.value = d.tone ?? 'neutre';
+      els.context.value = d.context ?? '';
+      els.role.value = d.role ?? '';
+      els.mission.value = d.mission ?? '';
+      els.target.value = d.target ?? '';
+      els.constraints.value = d.constraints ?? '';
+      els.format.value = d.format ?? 'markdown';
+      els.formatCustom.value = d.formatCustom ?? '';
+      els.length.value = d.length ?? 'moyenne';
+      els.optQuestions.checked = !!d.optQuestions;
+      els.optAssumptions.checked = !!d.optAssumptions;
+      els.optSources.checked = !!d.optSources;
+      els.optChecklist.checked = !!d.optChecklist;
+      state.imperatifs = normalizeList(d.imperatifs);
+      state.souhaits = normalizeList(d.souhaits);
+      renderAll();
+      updatePreview();
+    }
+
+    function renderHistory() {
+      const items = loadHistory();
+      if (!items.length) {
+        els.history.innerHTML = '<div class="text-xs text-slate-500">Aucun élément enregistré.</div>';
+        return;
+      }
+      els.history.innerHTML = '';
+      items
+        .slice()
+        .sort((a,b) => b.ts - a.ts)
+        .slice(0, 30)
+        .forEach((it) => {
+          const row = document.createElement('div');
+          row.className = 'flex items-start gap-2 py-2 border-b border-slate-100 last:border-b-0';
+
+          const left = document.createElement('button');
+          left.type = 'button';
+          left.className = 'text-left flex-1 hover:underline';
+          const date = new Date(it.ts);
+          left.innerHTML = `
+            <div class="font-medium">${escapeHtml(it.title || 'Prompt')}</div>
+            <div class="text-xs text-slate-500">${date.toLocaleString()}</div>
+          `;
+          left.addEventListener('click', () => applySnapshot(it));
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'shrink-0 px-2 py-1 text-xs rounded-xl border border-slate-200 bg-white hover:bg-slate-50';
+          del.textContent = 'Suppr.';
+          del.addEventListener('click', () => {
+            const next = loadHistory().filter(x => x.ts !== it.ts);
+            saveHistory(next);
+            renderHistory();
+          });
+
+          row.appendChild(left);
+          row.appendChild(del);
+          els.history.appendChild(row);
+        });
+    }
+
+    function renderTemplates() {
+      els.templates.innerHTML = '';
+      templates.forEach((t) => {
+        const card = document.createElement('div');
+        card.className = 'rounded-2xl border border-slate-200 p-4 bg-white hover:bg-slate-50 transition shadow-sm';
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-semibold">${escapeHtml(t.title)}</div>
+              <div class="text-sm text-slate-600 mt-0.5">${escapeHtml(t.desc)}</div>
+            </div>
+            <button class="px-3 py-2 text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800">Charger</button>
+          </div>
+        `;
+        card.querySelector('button').addEventListener('click', () => {
+          t.apply();
+          renderAll();
+          updatePreview();
+          showToast('Modèle chargé');
+        });
+        els.templates.appendChild(card);
+      });
+    }
+
+    function renderAll() {
+      renderChips(els.impChips, state.imperatifs, (idx) => {
+        state.imperatifs.splice(idx, 1);
+        renderAll();
+        updatePreview();
+      });
+      renderChips(els.wishChips, state.souhaits, (idx) => {
+        state.souhaits.splice(idx, 1);
+        renderAll();
+        updatePreview();
+      });
+    }
+
+    // Events
+    function bindInput(el) {
+      el.addEventListener('input', updatePreview);
+      el.addEventListener('change', updatePreview);
+    }
+
+    [
+      els.aiTarget, els.contentType, els.outputLang, els.tone,
+      els.context, els.role, els.mission, els.target,
+      els.constraints, els.format, els.formatCustom, els.length,
+      els.optQuestions, els.optAssumptions, els.optSources, els.optChecklist
+    ].forEach(bindInput);
+
+    function addImperatif(txt) {
+      const v = (txt ?? els.impInput.value).trim();
+      if (!v) return;
+      state.imperatifs.push(v);
+      els.impInput.value = '';
+      renderAll();
+      updatePreview();
+    }
+
+    function addSouhait(txt) {
+      const v = (txt ?? els.wishInput.value).trim();
+      if (!v) return;
+      state.souhaits.push(v);
+      els.wishInput.value = '';
+      renderAll();
+      updatePreview();
+    }
+
+    els.impAdd.addEventListener('click', () => addImperatif());
+    els.wishAdd.addEventListener('click', () => addSouhait());
+
+    els.impInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addImperatif(); }
+    });
+    els.wishInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addSouhait(); }
+    });
+
+    els.btnCopy.addEventListener('click', copyPrompt);
+
+    // Ajouter un bouton pour copier le prompt
+    const copyButton = document.createElement('button');
+    copyButton.id = 'copyButton';
+    copyButton.className = 'px-3 py-2 text-sm rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-soft';
+    copyButton.textContent = 'Copier le prompt';
+    copyButton.addEventListener('click', copyPrompt);
+    
+    // Insérer le bouton à côté du bouton existant
+    const buttonsContainer = document.querySelector('.ml-auto.flex.items-center.gap-2');
+    buttonsContainer.insertBefore(copyButton, els.btnCopy);
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        copyPrompt();
+      }
+    });
+
+    els.btnWrap.addEventListener('click', () => {
+      state.wrap = !state.wrap;
+      els.btnWrap.classList.toggle('bg-slate-900');
+      els.btnWrap.classList.toggle('text-white');
+      updatePreview();
+    });
+
+    els.btnReset.addEventListener('click', () => {
+      els.aiTarget.value = 'chat';
+      els.contentType.value = 'article';
+      els.outputLang.value = 'fr';
+      els.tone.value = 'neutre';
+      els.context.value = '';
+      els.role.value = '';
+      els.mission.value = '';
+      els.target.value = '';
+      els.constraints.value = '';
+      els.format.value = 'markdown';
+      els.formatCustom.value = '';
+      els.length.value = 'moyenne';
+      els.optQuestions.checked = true;
+      els.optAssumptions.checked = true;
+      els.optSources.checked = false;
+      els.optChecklist.checked = false;
+      state.imperatifs = [];
+      state.souhaits = [];
+      renderAll();
+      updatePreview();
+      showToast('Réinitialisé');
+    });
+
+    els.btnSave.addEventListener('click', () => {
+      const snap = getFormSnapshot();
+      const items = loadHistory();
+      items.push(snap);
+      // Keep last 60
+      items.sort((a,b) => b.ts - a.ts);
+      saveHistory(items.slice(0, 60));
+      renderHistory();
+      showToast('Enregistré');
+    });
+
+    els.btnDownload.addEventListener('click', () => {
+      const ts = new Date();
+      const name = `prompt-${ts.toISOString().slice(0,19).replaceAll(':','-')}.txt`;
+      downloadTxt(name, els.preview.value);
+      showToast('Téléchargement prêt');
+    });
+
+    els.btnClearHistory.addEventListener('click', () => {
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory();
+      showToast('Historique effacé');
+    });
+
+    // initial render
+    renderQuick(els.impQuick, quickImperatifs, addImperatif);
+    renderQuick(els.wishQuick, quickSouhaits, addSouhait);
+    renderTemplates();
+    renderHistory();
+    renderAll();
+    updatePreview();
+  </script>
+</body>
+</html>
